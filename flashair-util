@@ -11,7 +11,7 @@ from functools import partial
 from pathlib import Path
 
 from requests import RequestException
-from tfatool import command, sync, info, cgi, util
+from tfatool import command, sync, info, cgi, util, upload
 
 
 logger = logging.getLogger("main")
@@ -32,6 +32,8 @@ actions.add_argument("-S", "--sync-once", default=False,
                      choices=["time", "name", "all"],
                      help="move files (all or by most recent name/timestamp) from "
                           "REMOTE_DIR to LOCAL_DIR, then quit")
+actions.add_argument("--delete",
+                     help="delete a given file (within --remote-dir)")
 
 setup = parser.add_argument_group("Setup")
 setup.add_argument("-y", "--sync-direction", choices=["up", "down", "both"],
@@ -63,6 +65,15 @@ def run():
     args = parser.parse_args()
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
+
+    # delete a file
+    if args.delete:
+        try:
+            upload.delete_file_in(args.delete, remote_dir=args.remote_dir)
+            logger.info("Deleted remote file {} in directory {}".format(
+                        args.delete, args.remote_dir))
+        except RequestException as e:
+            print("\nHTTP request exception: {}".format(e))
 
     # filename filters
     filters = []

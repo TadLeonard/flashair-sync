@@ -28,7 +28,7 @@ def test_invalid_timeout_value():
 def test_valid_timeout_value():
     params = {Config.wifi_timeout: 120.5201}
     assert config(params)["APPAUTOTIME"] == 120520
-    
+
 
 def test_full_config():
     params = {Config.wifi_timeout: 60,
@@ -51,7 +51,7 @@ def test_full_config():
                 'APPMODE': 2, 'APPNETWORKKEY': 'supersecret', 'TIMEZONE': -20,
                 'BRGSSID': 'officewifi', 'CLEARCODE': 1,
                 'MASTERCODE': 'beefbeefbeef'}
-    
+
 
 def test_command_cgi_query():
     req = command._prep_get(command.Operation.list_files, DIR="/DCIM/WOMP")
@@ -66,6 +66,28 @@ def test_command_cgi_url():
     print(req.url)
     url, _ = parse.splitquery(req.url)
     assert url == "http://192.168.0.1/command.cgi"
+
+
+def test_delete_request():
+    req = upload._prep_delete_request("ham.png")
+    assert (req.url ==
+            "http://flashair/upload.cgi?DEL=%2FDCIM%2F100__TSB%2Fham.png")
+
+    # From the FlashAir docs
+    # Request Example:
+    # http://flashair/upload.cgi?DEL=/DCIM/100__TSB/DSC_100.JPG
+    expected = "http://flashair/upload.cgi?DEL=/DCIM/100__TSB/DSC_100.JPG"
+    raw_url = upload._prep_delete_request("DSC_100.JPG").url
+    assert raw_url.replace("%2F", "/") == expected
+
+
+def test_delete_request_no_directory():
+    """Make sure the user can specify a `None` remote directory
+    so that they can construct full paths of their own to delete files.
+    """
+    req = upload._prep_delete_request("ham.png", remote_dir=None)
+    assert (req.url ==
+            "http://flashair/upload.cgi?DEL=ham.png")
 
 
 def test_datetime_encode_decode():
@@ -91,7 +113,7 @@ def test_datetime_str_encode():
     datetime_val = 0x00340153  # a 32-bit encoded date
     as_string = upload._str_encode_time(datetime_val)
     assert as_string == "0x00340153"
- 
+
 
 def test_upload_post_url():
     docs_url = "http://flashair/upload.cgi?WRITEPROTECT=ON"  # from docs

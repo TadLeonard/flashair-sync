@@ -49,4 +49,3 @@ prep_get = partial(prep_request, "GET")
 get = partial(request, "GET")
 prep_post = partial(prep_request, "POST")
 post = partial(request, "POST")
-
