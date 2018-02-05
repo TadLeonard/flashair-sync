@@ -1,8 +1,8 @@
-import logging
 from functools import partial
 from . import cgi
-from .info import URL, DEFAULT_MASTERCODE
+from .info import DEFAULT_MASTERCODE
 from .info import WifiMode, WifiModeOnBoot, ModeValue, DriveMode, Config
+from .session import Session
 
 
 def config(param_map, mastercode=DEFAULT_MASTERCODE):
@@ -21,10 +21,10 @@ def _process_params(params):
         yield param.value, value_validators[param](value)
 
 
-def post(param_map, url=URL):
+def post(param_map, session: Session = Session()):
     """Posts a `param_map` created with `config` to
     the FlashAir config.cgi entrypoint"""
-    prepped_request = _prep_post(url=url, **param_map)
+    prepped_request = _prep_post(url=session.url, **param_map)
     return cgi.send(prepped_request)
 
 
@@ -62,7 +62,7 @@ def _validate_app_info(info: str):
 @_validator(Config.wifi_mode)
 def _validate_wifi_mode(mode: ModeValue):
     assert mode in WifiMode or mode in WifiModeOnBoot
-    return int(mode) 
+    return int(mode)
 
 
 @_validator(Config.wifi_key)
@@ -121,4 +121,3 @@ def _validate_timezone(hours_offset: int):
 def _validate_drive_mode(mode: DriveMode):
     assert mode in DriveMode
     return int(mode)
-

@@ -1,7 +1,6 @@
 import arrow
 
-from itertools import groupby
-from operator import attrgetter, itemgetter
+from operator import attrgetter
 
 
 def parse_datetime(datetime_input):
@@ -15,7 +14,7 @@ def parse_datetime(datetime_input):
     time_vals = _parse_time(time_els)
     vals = tuple(date_vals) + tuple(time_vals)
     return arrow.get(*vals)
-    
+
 
 def _split_datetime(datetime_input):
     dt_input = datetime_input.split(" ")
@@ -73,7 +72,7 @@ def _parse_date(date_els):
 
 def _parse_time(time_els):
     if len(time_els) == 1:
-        time_vals = 0, 0, 0 
+        time_vals = 0, 0, 0
     elif len(time_els) == 2:
         time_vals = time_els + (0,)  # assumed H:M
     elif len(time_els) == 3:
@@ -81,7 +80,7 @@ def _parse_time(time_els):
     else:
         raise ValueError("Time '{}' can't be understood".format(time_els))
     return map(int, time_vals)
-        
+
 
 def _is_year(element):
     return len(element) == 4
@@ -92,7 +91,7 @@ def fmt_file_rows(files):
     for f in files:
         fname = f.filename
         fdate = f.datetime.format("YYYY-MM-DD")
-        ftime = f.datetime.format("HH:mm") 
+        ftime = f.datetime.format("HH:mm")
         size = "{:> 3.02f}".format(f.size / 10**6)
         human = f.datetime.humanize()
         yield fname, fdate, ftime, size, human
@@ -108,4 +107,3 @@ def get_size_units(nbytes):
     else:
         units, val = "B", nbytes
     return val, units
-

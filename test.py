@@ -6,7 +6,7 @@ from urllib import parse
 from tfatool.info import Config, WifiMode, DriveMode
 from tfatool.info import Upload, WriteProtectMode
 from tfatool.config import config
-from tfatool import command, upload, util, sync
+from tfatool import command, upload, util, sync, session
 
 
 def test_config_construction():
@@ -28,7 +28,7 @@ def test_invalid_timeout_value():
 def test_valid_timeout_value():
     params = {Config.wifi_timeout: 120.5201}
     assert config(params)["APPAUTOTIME"] == 120520
-    
+
 
 def test_full_config():
     params = {Config.wifi_timeout: 60,
@@ -51,7 +51,7 @@ def test_full_config():
                 'APPMODE': 2, 'APPNETWORKKEY': 'supersecret', 'TIMEZONE': -20,
                 'BRGSSID': 'officewifi', 'CLEARCODE': 1,
                 'MASTERCODE': 'beefbeefbeef'}
-    
+
 
 def test_command_cgi_query():
     req = command._prep_get(command.Operation.list_files, DIR="/DCIM/WOMP")
@@ -91,12 +91,19 @@ def test_datetime_str_encode():
     datetime_val = 0x00340153  # a 32-bit encoded date
     as_string = upload._str_encode_time(datetime_val)
     assert as_string == "0x00340153"
- 
+
 
 def test_upload_post_url():
     docs_url = "http://flashair/upload.cgi?WRITEPROTECT=ON"  # from docs
-    wp = upload.prep_post(**{Upload.write_protect:
-                             WriteProtectMode.on})
+    wp = upload.prep_post(**{Upload.write_protect: WriteProtectMode.on})
+    assert docs_url == wp.url
+
+
+def test_upload_post_custom_url():
+    docs_url = "http://10.10.3.1/upload.cgi?WRITEPROTECT=ON"  # from docs
+    special_session = session.Session(url="10.10.3.1")
+    wp = upload.prep_post(**{Upload.write_protect: WriteProtectMode.on},
+                          session=special_session)
     assert docs_url == wp.url
 
 

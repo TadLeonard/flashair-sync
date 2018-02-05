@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 
 import logging
-from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
+from argparse import ArgumentParser
 from tfatool import config, command, cgi, info
+from tfatool.session import Session
 from requests import RequestException
 
 
@@ -17,6 +18,9 @@ parser.add_argument("-m", "--mastercode", default="BEEFBEEFBEEF",
                     help="12-digit hex mastercode to enable configuration "
                          "of the FlashAir device")
 parser.add_argument("-v", "--verbose", action="store_true")
+parser.add_argument("-u", "--url", default=info.URL,
+                    help="URL of your FlashAir device "
+                         "(must start with http://)")
 
 wifi = parser.add_argument_group("WiFi settings")
 wifi.add_argument("-t", "--wifi-timeout", help="set WiFi timeout of device",
@@ -51,6 +55,7 @@ show.add_argument("--show-wifi-mode", action="store_true")
 
 def run():
     args = parser.parse_args()
+    session = Session(url=args.url)
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
 
@@ -72,21 +77,22 @@ def run():
     cgi_params = config.config(params)
     if len(list(cgi_params.keys())) > 1:
         logger.info("CGI params: {}".format(cgi_params))
-        response = config.post(cgi_params)
+        response = config.post(cgi_params, session=session)
         logger.info("Response: {}".format(response.status_code))
 
     # show config params with a GET
     if args.show_wifi_ssid:
-        print("SSID: {}".format(command.get_ssid()))
+        print("SSID: {}".format(command.get_ssid(session)))
     if args.show_wifi_key:
-        print("WiFi key: {}".format(command.get_password()))
+        print("WiFi key: {}".format(command.get_password(session)))
     if args.show_mac:
-        print("MAC address: {}".format(command.get_mac()))
+        print("MAC address: {}".format(command.get_mac(session)))
     if args.show_fw_version:
-        print("Firmware version: {}".format(command.get_fw_version()))
+        print("Firmware version: {}".format(command.get_fw_version(session)))
     if args.show_wifi_mode:
-        mode = command.get_wifi_mode()
+        mode = command.get_wifi_mode(session)
         print("WiFi mode: {} ({:d})".format(mode.name, mode.value))
+
 
 if __name__ == "__main__":
     with cgi.session:
@@ -94,4 +100,3 @@ if __name__ == "__main__":
             run()
         except RequestException as e:
             print("\nHTTP request exception: {}".format(e))
-

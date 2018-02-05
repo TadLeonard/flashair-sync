@@ -27,7 +27,7 @@ def request(method, entrypoint: Entrypoint, url=URL,
     prepared_req = prep_request(method, entrypoint, url=url,
                                 req_kwargs=req_kwargs, **params)
     send_kwargs = send_kwargs or {}
-    return send(prepared_request, **send_kwargs)
+    return send(prepared_req, **send_kwargs)
 
 
 def prep_request(method, entrypoint, url=URL, req_kwargs=None, **params):
@@ -49,4 +49,3 @@ prep_get = partial(prep_request, "GET")
 get = partial(request, "GET")
 prep_post = partial(prep_request, "POST")
 post = partial(request, "POST")
-

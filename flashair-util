@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-#coding: UTF-8
+# coding: UTF-8
 
 import logging
 import re
@@ -12,6 +12,7 @@ from pathlib import Path
 
 from requests import RequestException
 from tfatool import command, sync, info, cgi, util
+from tfatool.session import Session
 
 
 logger = logging.getLogger("main")
@@ -26,12 +27,12 @@ actions = parser.add_argument_group("Actions")
 actions.add_argument("-l", "--list-files", action="store_true")
 actions.add_argument("-c", "--count-files", action="store_true")
 actions.add_argument("-s", "--sync-forever", action="store_true",
-                     help="watch for new files in REMOTE_DIR, copy them to LOCAL_DIR "
-                          "(runs until CTRL-C)")
+                     help="watch for new files in REMOTE_DIR, copy them to "
+                          "LOCAL_DIR (runs until CTRL-C)")
 actions.add_argument("-S", "--sync-once", default=False,
                      choices=["time", "name", "all"],
-                     help="move files (all or by most recent name/timestamp) from "
-                          "REMOTE_DIR to LOCAL_DIR, then quit")
+                     help="move files (all or by most recent name/timestamp) "
+                          "from REMOTE_DIR to LOCAL_DIR, then quit")
 
 setup = parser.add_argument_group("Setup")
 setup.add_argument("-y", "--sync-direction", choices=["up", "down", "both"],
@@ -43,20 +44,23 @@ setup.add_argument("-r", "--remote-dir", default=info.DEFAULT_REMOTE_DIR,
                         info.DEFAULT_REMOTE_DIR))
 setup.add_argument("-d", "--local-dir", default=".",
                    help="local directory to work with (default: working dir)")
+setup.add_argument("-u", "--url", default=info.URL,
+                   help="URL of your FlashAir device "
+                        "(must start with http://)")
 
 filt = parser.add_argument_group("File filters")
 filt.add_argument("-j", "--only-jpg", action="store_true",
-                   help="filter for only JPEG files")
-filt.add_argument("-n","--n-files", type=int, default=1,
-                   help="Number of files to move in --sync-once mode")
+                  help="filter for only JPEG files")
+filt.add_argument("-n", "--n-files", type=int, default=1,
+                  help="Number of files to move in --sync-once mode")
 filt.add_argument("-k", "--match-regex", default=None,
-                   help="filter for files that match the given pattern")
+                  help="filter for files that match the given pattern")
 filt.add_argument("-t", "--earliest-date",
-                   help="work on only files AFTER datetime of any "
-                        "reasonable format such as YYYY, YYYY-MM, "
-                        "MM/DD, HH:mm (today), or 'YYYY-MM-DD HH:mm:ss'")
+                  help="work on only files AFTER datetime of any "
+                       "reasonable format such as YYYY, YYYY-MM, "
+                       "MM/DD, HH:mm (today), or 'YYYY-MM-DD HH:mm:ss'")
 filt.add_argument("-T", "--latest-date",
-                   help="work on only files BEFORE given datetime")
+                  help="work on only files BEFORE given datetime")
 
 
 def run():
@@ -67,10 +71,12 @@ def run():
     # filename filters
     filters = []
     if args.only_jpg:
-        jpg_filter = lambda f: f.filename.lower().endswith(".jpg")
+        def jpg_filter(fileinfo) -> bool:
+            return fileinfo.filename.lower().endswith(".jpg")
         filters.append(jpg_filter)
     if args.match_regex:
-        regex_filter = lambda f: re.match(args.match_regex, f.filename)
+        def regex_filter(fileinfo) -> bool:
+            return re.match(args.match_regex, fileinfo.filename)
         filters.append(regex_filter)
 
     # datetme filters
@@ -96,28 +102,36 @@ def run():
             late = latest_date.format("YYYY-MM-DD HH:mm:ss")
         logger.info("Filtering from [{}] to [{}]".format(early, late))
 
+    # create a session.Session object based on given args
+    session = Session(url=args.url,
+                      local_dir=args.local_dir,
+                      remote_dir=args.remote_dir,
+                      filters=tuple(filters))
+
+    # carry out actions in the actions group
     try:
         if args.list_files:
-            print_file_list(filters, args)
+            print_file_list(session)
         if args.count_files:
-            print_file_count(filters, args)
+            print_file_count(session)
     except RequestException as e:
         print("\nHTTP request exception: {}".format(e))
 
     if args.sync_once == "all" and args.n_files != 1:
-        parser.error("`--sync-once all` doesn't make sense with `--num-files N`")
+        parser.error("`--sync-once all` doesn't make sense with "
+                     "`--num-files N`")
 
     if args.sync_forever or args.sync_once:
-        local_path = Path(args.local_dir)
+        local_path = Path(session.local_dir)
         if not local_path.is_dir():
-            logger.info("Creating directory '{}'".format(args.local_dir))
+            logger.info("Creating directory '{}'".format(session.local_dir))
             local_path.mkdir()
         if args.sync_once:
             methods = iter_sync_once_methods(args)
-            sync_once(methods, filters, args)
+            sync_once(methods, session, count=args.n_files)
         if args.sync_forever:
             try:
-                sync_loop(filters, args)
+                sync_loop(session, args)
             except KeyboardInterrupt:
                 pass
 
@@ -139,23 +153,22 @@ def iter_sync_once_methods(args):
             yield sync.down_by_all
 
 
-def sync_once(methods, filters, args):
+def sync_once(methods, session, count):
     for by_method in methods:
         try:
-            by_method(*filters, remote_dir=args.remote_dir,
-                      local_dir=args.local_dir, count=args.n_files)
+            by_method(session=session, count=count)
         except KeyboardInterrupt:
             break
 
 
-def sync_loop(filters, args):
+def sync_loop(session, args):
     try:
-        _sync_loop(filters, args)
+        _sync_loop(session, args)
     except KeyboardInterrupt:
         pass
 
 
-def _sync_loop(filters, args):
+def _sync_loop(session, args):
     if args.sync_direction == "both":
         run_method = sync.up_down_by_arrival
     elif args.sync_direction == "up":
@@ -164,9 +177,7 @@ def _sync_loop(filters, args):
         run_method = sync.down_by_arrival
 
     while True:
-        new_files = run_method(
-            *filters, local_dir=args.local_dir,
-            remote_dir=args.remote_dir)
+        new_files = run_method(session=session)
         logger.info("Waiting for newly arrived files...")
         try:
             while True:
@@ -183,12 +194,12 @@ def _sync_loop(filters, args):
 _fields = ["filename", "date", "time", "MB", "created"]
 
 
-def print_file_list(filters, args, count_only=False):
-    files = command.list_files(*filters, remote_dir=args.remote_dir)
+def print_file_list(session, count_only=False):
+    files = command.list_files(session)
     files = list(files)
     rows = util.fmt_file_rows(files)
     table = tabulate.tabulate(rows, headers=_fields, tablefmt="simple")
-    print("\nFiles in {}".format(args.remote_dir))
+    print("\nFiles in {}".format(session.remote_dir))
     if not count_only:
         print()
         print(table)
@@ -197,7 +208,7 @@ def print_file_list(filters, args, count_only=False):
     size, units = util.get_size_units(nbytes)
     print("({:d} files, {:0.2f} {} total)".format(
           len(files), size, units))
-    
+
 
 print_file_count = partial(print_file_list, count_only=True)
 
@@ -205,4 +216,3 @@ print_file_count = partial(print_file_list, count_only=True)
 if __name__ == "__main__":
     with cgi.session:
         run()
- 

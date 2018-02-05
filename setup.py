@@ -107,6 +107,7 @@ classifiers = [
 install_requires = ["requests>=2.9.0", "tqdm>=3.7.1", "arrow", "tabulate"]
 if sys.version_info < (3, 5):
     install_requires.append("scandir")
+    install_requires.append("typing")
 
 setup(name="tfatool",
       version=tfatool._version.__version__,
@@ -121,7 +122,7 @@ setup(name="tfatool",
       package_data={"": ["README.md"]},
       author="Tad Leonard",
       author_email="tadfleonard@gmail.com",
-      keywords="wireless sd card sdcard sync toshiba flashair", 
+      keywords="wireless sd card sdcard sync toshiba flashair",
       url=url,
       download_url=download,
       zip_safe=False,

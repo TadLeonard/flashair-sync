@@ -38,6 +38,7 @@ while `flashair-config` lets the user configure the the deivce.
 * `tfatool.upload`: abstraction of FlashAir's [upload.cgi](https://flashair-developers.com/en/documents/api/uploadcgi/)
 * `tfatool.config`: abstraction of FlashAir's [config.cgi](https://flashair-developers.com/en/documents/api/configcgi/)
 * `tfatool.sync`: functions for synchronizing local dirs with remote FlashAir dirs
+* `tfatool.session`: a `Session` object for managing the state of your connection to FlashAir (filters, URLs, and local/remote directories)
 
 Read the [FlashAir documentation](https://flashair-developers.com/en/documents/api/)
 for more information about the API `tfatool` uses.
@@ -47,11 +48,10 @@ for more information about the API `tfatool` uses.
 ### Help menu
 
 ```
-$ flashair-util -h
 usage: flashair-util [-h] [-v] [-l] [-c] [-s] [-S {time,name,all}]
-                     [-y {up,down,both}] [-r REMOTE_DIR] [-d LOCAL_DIR] [-j]
-                     [-n N_FILES] [-k MATCH_REGEX] [-t EARLIEST_DATE]
-                     [-T LATEST_DATE]
+                     [-y {up,down,both}] [-r REMOTE_DIR] [-d LOCAL_DIR]
+                     [-u URL] [-j] [-n N_FILES] [-k MATCH_REGEX]
+                     [-t EARLIEST_DATE] [-T LATEST_DATE]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -75,6 +75,7 @@ Setup:
                         /DCIM/100__TSB)
   -d LOCAL_DIR, --local-dir LOCAL_DIR
                         local directory to work with (default: working dir)
+  -u URL, --url URL     URL of your FlashAir device (must start with http://)
 
 File filters:
   -j, --only-jpg        filter for only JPEG files

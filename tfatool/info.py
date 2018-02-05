@@ -43,10 +43,11 @@ class Config(str, Enum):
     clear_mastercode = "CLEARCODE"  # clear mastercode
     timezone = "TIMEZONE"  # set timezone (e.g. 36)
     drive_mode = "WEBDAV"  # set FlashAir drive (WebDAV)
-    
 
-class ModeValue(int, Enum): ...
- 
+
+class ModeValue(int, Enum):
+    ...
+
 
 class WifiMode(ModeValue):
     """Wireless modes effective IMMEDIATELY"""
@@ -85,5 +86,3 @@ class WriteProtectMode(str, Enum):
 class ResponseCode(str, Enum):
     success = "SUCCESS"
     error = "ERROR"
-
-

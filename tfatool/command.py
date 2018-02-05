@@ -3,10 +3,13 @@ import arrow
 
 from pathlib import PurePosixPath
 from collections import namedtuple
+from typing import Dict, Iterable
+
 from . import cgi
-from .info import URL, DEFAULT_REMOTE_DIR
-from .info import WifiMode, WifiModeOnBoot, ModeValue, Operation
+from .info import URL
+from .info import WifiMode, WifiModeOnBoot, Operation
 from .info import FileInfo, RawFileInfo
+from .session import Session
 
 
 logger = logging.getLogger(__name__)
@@ -16,36 +19,40 @@ logger = logging.getLogger(__name__)
 # command.cgi API
 
 
-def map_files(*filters, remote_dir=DEFAULT_REMOTE_DIR, url=URL):
-    files = list_files(*filters, remote_dir=remote_dir, url=url)
+def map_files(session: Session = Session()) -> Dict[str, FileInfo]:
+    files = list_files(session)
     return {f.filename: f for f in files}
 
 
-def list_files(*filters, remote_dir=DEFAULT_REMOTE_DIR, url=URL):
-    response = _get(Operation.list_files, url, DIR=remote_dir)
+def list_files(session: Session = Session()) -> Iterable[FileInfo]:
+    response = _get(Operation.list_files,
+                    session.url, DIR=session.remote_dir)
     files = _split_file_list(response.text)
-    return (f for f in files if all(filt(f) for filt in filters))
+    return (f for f in files if all(filt(f) for filt in session.filters))
 
 
-def map_files_raw(*filters, remote_dir=DEFAULT_REMOTE_DIR, url=URL):
-    files = list_files_raw(*filters, remote_dir=remote_dir, url=url)
+def map_files_raw(
+        session: Session = Session()) -> Dict[str, RawFileInfo]:
+    files = list_files_raw(session)
     return {f.filename: f for f in files}
 
 
-def list_files_raw(*filters, remote_dir=DEFAULT_REMOTE_DIR, url=URL):
-    response = _get(Operation.list_files, url, DIR=remote_dir)
+def list_files_raw(session: Session = Session()) -> Iterable[RawFileInfo]:
+    response = _get(Operation.list_files,
+                    session.url, DIR=session.remote_dir)
     files = _split_file_list_raw(response.text)
-    return (f for f in files if all(filt(f) for filt in filters))
+    return (f for f in files if all(filt(f) for filt in session.filters))
 
 
-def count_files(remote_dir=DEFAULT_REMOTE_DIR, url=URL):
-    response = _get(Operation.count_files, url, DIR=remote_dir)
+def count_files(session: Session = Session()) -> int:
+    response = _get(Operation.count_files, session.url,
+                    DIR=session.remote_dir)
     return int(response.text)
 
 
-def memory_changed(url=URL):
+def memory_changed(session: Session = Session()) -> bool:
     """Returns True if memory has been written to, False otherwise"""
-    response = _get(Operation.memory_changed, url)
+    response = _get(Operation.memory_changed, session.url)
     try:
         return int(response.text) == 1
     except ValueError:
@@ -53,32 +60,32 @@ def memory_changed(url=URL):
                       "memory changed CGI command failed")
 
 
-def get_ssid(url=URL):
-    return _get(Operation.get_ssid, url).text
+def get_ssid(session: Session = Session()):
+    return _get(Operation.get_ssid, session.url).text
 
 
-def get_password(url=URL):
-    return _get(Operation.get_password, url).text
+def get_password(session: Session = Session()):
+    return _get(Operation.get_password, session.url).text
 
 
-def get_mac(url=URL):
-    return _get(Operation.get_mac, url).text
+def get_mac(session: Session = Session()):
+    return _get(Operation.get_mac, session.url).text
 
 
-def get_browser_lang(url=URL):
-    return _get(Operation.get_browser_lang, url).text
+def get_browser_lang(session: Session = Session()):
+    return _get(Operation.get_browser_lang, session.url).text
 
 
-def get_fw_version(url=URL):
-    return _get(Operation.get_fw_version, url).text
+def get_fw_version(session: Session = Session()):
+    return _get(Operation.get_fw_version, session.url).text
 
 
-def get_ctrl_image(url=URL):
-    return _get(Operation.get_ctrl_image, url).text
+def get_ctrl_image(session: Session = Session()):
+    return _get(Operation.get_ctrl_image, session.url).text
 
 
-def get_wifi_mode(url=URL) -> WifiMode:
-    mode_value = int(_get(Operation.get_wifi_mode, url).text)
+def get_wifi_mode(session: Session = Session()) -> WifiMode:
+    mode_value = int(_get(Operation.get_wifi_mode, session.url).text)
     all_modes = list(WifiMode) + list(WifiModeOnBoot)
     for mode in all_modes:
         if mode.value == mode_value:
@@ -89,7 +96,7 @@ def get_wifi_mode(url=URL) -> WifiMode:
 #####################
 # API implementation
 
-def _split_file_list(text):
+def _split_file_list(text: str) -> Iterable[FileInfo]:
     lines = text.split("\r\n")
     for line in lines:
         groups = line.split(",")
@@ -104,7 +111,7 @@ def _split_file_list(text):
                            size, attribute, timeinfo)
 
 
-def _split_file_list_raw(text):
+def _split_file_list_raw(text: str) -> Iterable[RawFileInfo]:
     lines = text.split("\r\n")
     for line in lines:
         groups = line.split(",")
@@ -114,7 +121,7 @@ def _split_file_list_raw(text):
             yield RawFileInfo(directory, filename, path, int(size))
 
 
-def _decode_time(date_val: int, time_val: int):
+def _decode_time(date_val: int, time_val: int) -> arrow.Arrow:
     year = (date_val >> 9) + 1980  # 0-val is the year 1980
     month = (date_val & (0b1111 << 5)) >> 5
     day = date_val & 0b11111
@@ -135,7 +142,8 @@ def _decode_time(date_val: int, time_val: int):
 AttrInfo = namedtuple(
     "AttrInfo", "archive directly volume system_file hidden_file read_only")
 
-def _decode_attribute(attr_val: int):
+
+def _decode_attribute(attr_val: int) -> AttrInfo:
     bit_positions = reversed(range(6))
     bit_flags = [bool(attr_val & (1 << bit)) for bit in bit_positions]
     return AttrInfo(*bit_flags)
@@ -153,4 +161,3 @@ def _get(operation: Operation, url=URL, **params):
 def _prep_get(operation: Operation, url=URL, **params):
     params.update(op=int(operation))  # op param required
     return cgi.prep_get(cgi.Entrypoint.command, url=url, **params)
-
